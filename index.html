@@ -1,0 +1,1730 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>Hopalong</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --panel-rgb: 12, 14, 20;
+        --panel-bg: rgba(var(--panel-rgb), var(--dialog-alpha));
+        --ui-gray-rgb: 148, 154, 164;
+        --panel-border: rgba(var(--ui-gray-rgb), 0.18);
+        --param-outline: rgba(var(--ui-gray-rgb), 0.42);
+        --text: rgb(var(--ui-gray-rgb));
+        --name-box-width: 154px;
+        --tile-size: 42px;
+        --ui-font-size: 14px;
+        --ui-font-weight: 600;
+        --dialog-alpha: 0.9;
+        --help-label-font-size: clamp(12px, 1.1vw, 14px);
+        --help-label-padding-y: 8px;
+        --help-label-padding-x: 12px;
+        --cmap-bar-width: 97px;
+      }
+      *, *::before, *::after {
+        box-sizing: border-box;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #05070c;
+        color: var(--text);
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        touch-action: none;
+        overscroll-behavior: none;
+      }
+      #app { position: relative; width: 100%; height: 100%; }
+      #version-badge {
+        font-size: 10px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        pointer-events: none;
+        align-self: center;
+        margin-right: 2px;
+      }
+
+      #app, #pickerOverlay, #quickSlider, #paramOverlay, button, input, select, textarea, label, span, p {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        touch-action: none;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        font-size: var(--ui-font-size);
+        font-weight: var(--ui-font-weight);
+      }
+      #canvasStack {
+        position: absolute;
+        inset: 0;
+      }
+      #c,
+      #interestOverlayCanvas,
+      #debugOverlayCanvas,
+      #manualOverlayCanvas {
+        position: absolute;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      #c {
+        touch-action: none;
+      }
+      #interestOverlayCanvas,
+      #debugOverlayCanvas,
+      #manualOverlayCanvas {
+        pointer-events: none;
+      }
+      #toast {
+        position: absolute;
+        top: calc(12px + env(safe-area-inset-top));
+        left: max(12px, env(safe-area-inset-left));
+        right: max(12px, env(safe-area-inset-right));
+        margin: 0 auto;
+        width: fit-content;
+        max-width: min(700px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: var(--ui-font-size);
+        line-height: 1.4;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(-8px);
+        transition: opacity 220ms ease, transform 220ms ease;
+        z-index: 45;
+      }
+      #toast.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      #toast.is-below-actions {
+        top: var(--toast-below-top, 56px);
+      }
+
+      #welcomeOverlay {
+        position: absolute;
+        inset: 0;
+        z-index: 70;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(4, 6, 10, 0.62);
+      }
+      #welcomeOverlay.is-open { display: flex; }
+      #welcomePanel {
+        width: min(760px, calc(100vw - 24px));
+        border-radius: 14px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.22);
+        background: var(--panel-bg);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+      }
+      .welcomeTitle {
+        margin: 0;
+        font-size: clamp(20px, 3.2vw, 28px);
+      }
+      .welcomeBody {
+        margin: 0;
+        line-height: 1.45;
+        font-size: clamp(14px, 2vw, 17px);
+      }
+      .welcomeActions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .welcomeActionBtn {
+        border-radius: 9px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.26);
+        background: rgba(var(--ui-gray-rgb), 0.12);
+        color: var(--text);
+        min-height: 40px;
+        padding: 8px 14px;
+      }
+      #welcomeDismissBtn {
+        margin-left: auto;
+      }
+      #debugPanel {
+        position: absolute;
+        top: calc(42px + env(safe-area-inset-top));
+        left: max(0px, env(safe-area-inset-left));
+        z-index: 38;
+        width: fit-content;
+        max-width: min(300px, calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+        max-height: calc(48vh - env(safe-area-inset-top));
+        overflow: auto;
+        touch-action: pan-y;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        background: rgba(12, 14, 20, 0.22);
+        border: 1px solid var(--panel-border);
+        border-radius: 9px;
+        padding: 6px 8px;
+        font-size: var(--ui-font-size);
+        line-height: 1.45;
+      }
+      #debugPanel.is-hidden { display: none; }
+      #debugInfo {
+        margin: 0;
+        color: rgba(255, 130, 130, 0.96);
+        font-variant-numeric: tabular-nums;
+        white-space: pre-line;
+      }
+      #rangesEditorToggle {
+        font-size: var(--ui-font-size);
+      }
+
+      #topRightActions {
+        position: absolute;
+        top: calc(10px + env(safe-area-inset-top));
+        right: max(2px, env(safe-area-inset-right));
+        z-index: 39;
+        display: flex;
+        gap: 6px;
+        align-items: stretch;
+      }
+
+      .topActionBtn {
+        width: var(--tile-size);
+        height: var(--tile-size);
+        min-height: var(--tile-size);
+        border-radius: 10px;
+        border: 2px solid var(--param-outline);
+        background: var(--panel-bg);
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+      }
+
+      #rangesEditorPanel,
+      #formulaSettingsPanel,
+      #colorSettingsPanel,
+      #modeSettingsPanel {
+        position: absolute;
+        top: calc(84px + env(safe-area-inset-top));
+        right: max(8px, env(safe-area-inset-right));
+        z-index: 37;
+        width: min(380px, calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+        max-height: calc(72vh - env(safe-area-inset-top));
+        overflow: auto;
+        touch-action: pan-y;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 10px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.15);
+        background: var(--panel-bg);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        padding: 10px;
+      }
+      #rangesEditorPanel.is-hidden,
+      #formulaSettingsPanel.is-hidden,
+      #colorSettingsPanel.is-hidden,
+      #modeSettingsPanel.is-hidden {
+        display: none;
+      }
+
+      #formulaSettingsPanel,
+      #rangesEditorPanel,
+      #colorSettingsPanel,
+      #modeSettingsPanel {
+        z-index: 42;
+      }
+      #formulaSettingsPanel,
+      #colorSettingsPanel,
+      #modeSettingsPanel {
+        z-index: 49;
+      }
+      .rangesEditorHead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .rangesEditorHead strong { font-size: var(--ui-font-size); }
+      #formulaSettingsClose,
+      #colorSettingsClose {
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.2);
+        border-radius: 8px;
+        min-width: 28px;
+        min-height: 28px;
+        background: rgba(var(--ui-gray-rgb), 0.08);
+        color: var(--text);
+      }
+      .rangesEditorTabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .rangesTabBtn {
+        min-height: 32px;
+        border-radius: 7px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.2);
+        background: rgba(var(--ui-gray-rgb), 0.06);
+        color: var(--text);
+        font-size: var(--ui-font-size);
+      }
+      .rangesTabBtn.is-active {
+        background: rgba(var(--ui-gray-rgb), 0.16);
+      }
+      .rangesEditorBody {
+        display: grid;
+        gap: 12px;
+      }
+      .settingsTabPanel.is-hidden {
+        display: none;
+      }
+      #rangesEditorPanel.simpleSettingsMode .perfSettingCard:not(.simpleSettingsCard) {
+        display: none;
+      }
+      #rangesEditorPanel.simpleSettingsMode .fullSettingsOnly {
+        display: none !important;
+      }
+      .pickerOptionRow {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: stretch;
+      }
+      .formulaPickerSettingsBtn {
+        min-width: 34px;
+        min-height: 34px;
+        border-radius: 10px;
+        border: 2px solid var(--param-outline);
+        background: var(--panel-bg);
+        color: var(--text);
+        font-size: var(--ui-font-size);
+        line-height: 1;
+      }
+      
+      .colorPickerSettingsBtn {
+        min-width: 34px;
+        min-height: 34px;
+        border-radius: 10px;
+        border: 2px solid var(--param-outline);
+        background: var(--panel-bg);
+        color: var(--text);
+        font-size: var(--ui-font-size);
+        line-height: 1;
+      }
+      .colorSettingsBody { display: grid; gap: 10px; }
+      .colorPreviewWide { height: 18px; border-radius: 999px; border: 1px solid rgba(var(--ui-gray-rgb),0.25); width: 100%; }
+      .colorStopCard { border:1px solid rgba(var(--ui-gray-rgb),0.2); border-radius:8px; padding:8px; display:grid; gap:6px; }
+      .stopRow { display:grid; grid-template-columns: 1fr auto auto auto; gap:8px; align-items:center; }
+      .colorStopTile { width:34px; height:34px; border-radius:8px; border:1px solid rgba(var(--ui-gray-rgb),0.35); background:#fff; position:relative; }
+      .colorStopTile.is-transparent::before,
+      .colorStopTile.is-transparent::after { content:""; position:absolute; left:-1px; top:16px; width:calc(100% + 2px); height:2px; background:#d00; transform-origin:center; }
+      .colorStopTile.is-transparent::before { transform:rotate(-35deg); }
+      .colorStopTile.is-transparent::after { transform:rotate(35deg); }
+      .colorStopActions { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
+
+
+      .rangeInput {
+        width: 100%;
+        min-height: 32px;
+        border-radius: 7px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.2);
+        background: rgba(0, 0, 0, 0.2);
+        color: var(--text);
+        padding: 5px 7px;
+        font-size: var(--ui-font-size);
+      }
+      .rangeGrid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .rangeGridTight {
+        margin-top: -4px;
+      }
+      .formulaDetailBox {
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.14);
+        border-radius: 8px;
+        padding: 6px;
+        background: rgba(var(--ui-gray-rgb), 0.05);
+        display: grid;
+        gap: 4px;
+      }
+      .formulaDetailLine {
+        margin: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: calc(var(--ui-font-size) - 1px);
+        line-height: 1.35;
+        opacity: 0.9;
+        overflow-wrap: anywhere;
+      }
+      #formulaSettingsPanel {
+        right: auto;
+        left: max(8px, env(safe-area-inset-left));
+        z-index: 60;
+      }
+      .formulaNameTitle {
+        margin: 0;
+        font-size: calc(var(--ui-font-size) + 1px);
+        font-weight: 800;
+      }
+      .formulaParamTable {
+        display: grid;
+        gap: 6px;
+      }
+      .formulaParamHead,
+      .formulaParamRow {
+        display: grid;
+        grid-template-columns: 34px repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        align-items: center;
+      }
+      .formulaParamHead {
+        opacity: 0.85;
+      }
+      .formulaParamHead span {
+        text-align: center;
+      }
+      .formulaParamKey {
+        text-transform: lowercase;
+      }
+      .rangeField {
+        display: grid;
+        gap: 4px;
+      }
+      .rangeFieldLabel {
+        font-size: var(--ui-font-size);
+        opacity: 0.85;
+      }
+      .rangeInput.is-na {
+        text-align: center;
+        opacity: 0.7;
+      }
+      .seedGrid {
+        display: grid;
+        grid-template-columns: 34px repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        align-items: start;
+      }
+      .seedGrid .rangeFieldLabel,
+      .seedGrid .rangeInput {
+        text-align: center;
+      }
+      .seedFieldX { grid-column: 2; }
+      .seedFieldY { grid-column: 3; }
+      .rangeActions {
+        display: grid;
+        grid-template-columns: 34px repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .rangeActionBtn {
+        min-height: 32px;
+        border-radius: 8px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.2);
+        background: rgba(var(--ui-gray-rgb), 0.08);
+        color: var(--text);
+        padding: 0 10px;
+      }
+      .rangeActions .rangeActionBtn:nth-child(1) { grid-column: 2; }
+      .rangeActions .rangeActionBtn:nth-child(2) { grid-column: 3; }
+      .rangeActions .rangeActionBtn:nth-child(3) { grid-column: 4; }
+      #rangesEditorWarning {
+        min-height: 18px;
+        font-size: var(--ui-font-size);
+        color: #ffadad;
+      }
+
+      .perfSettingCard {
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.12);
+        border-radius: 8px;
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+      }
+      .perfSettingCard.is-hidden {
+        display: none;
+      }
+      .factoryResetBtn {
+        width: 100%;
+        min-height: 34px;
+      }
+      .perfSettingHead {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 6px;
+      }
+      .perfSettingLabel {
+        font-size: var(--ui-font-size);
+        font-weight: var(--ui-font-weight);
+      }
+      .perfControlRow {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+      }
+      .perfRangeInput {
+        width: 100%;
+      }
+
+      input[type="color"].perfRangeInput,
+      .colorStopColorInput {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        padding: 0;
+        border-radius: 8px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.24);
+        background: rgba(0, 0, 0, 0.18);
+        overflow: hidden;
+        cursor: pointer;
+      }
+      input[type="color"].perfRangeInput::-webkit-color-swatch-wrapper,
+      .colorStopColorInput::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+      input[type="color"].perfRangeInput::-webkit-color-swatch,
+      .colorStopColorInput::-webkit-color-swatch {
+        border: 0;
+        border-radius: 7px;
+      }
+      input[type="color"].perfRangeInput::-moz-color-swatch,
+      .colorStopColorInput::-moz-color-swatch {
+        border: 0;
+        border-radius: 7px;
+      }
+      .perfSelect {
+        width: 100%;
+        min-height: 32px;
+        border-radius: 6px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.24);
+        background: var(--panel-bg);
+        color: var(--text);
+        font-size: var(--ui-font-size);
+        padding: 4px 8px;
+      }
+      .perfFormattedValue {
+        font-size: var(--ui-font-size);
+        opacity: 0.78;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .perfNumberInput {
+        width: 100%;
+        min-height: 30px;
+        border-radius: 6px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.2);
+        background: rgba(0,0,0,0.2);
+        color: var(--text);
+        padding: 4px 6px;
+      }
+      .perfInfoBtn {
+        min-width: 24px;
+        min-height: 24px;
+        border-radius: 999px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.24);
+        background: rgba(var(--ui-gray-rgb), 0.08);
+        color: var(--text);
+        font-size: var(--ui-font-size);
+      }
+      .compactIconBtn {
+        min-width: 34px;
+        min-height: 34px;
+        border-radius: 10px;
+        border: 2px solid var(--param-outline);
+        background: var(--panel-bg);
+        color: var(--text);
+        font-size: var(--ui-font-size);
+        line-height: 1;
+        padding: 0;
+      }
+      .colourPanelTopSection {
+        display: grid;
+        gap: 0;
+        padding: 6px 6px 6px 14px;
+        border-bottom: 1px solid rgba(var(--ui-gray-rgb), 0.12);
+      }
+      .pickerSectionRow {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        gap: 8px;
+        align-items: center;
+        min-height: 38px;
+      }
+      .pickerSectionRow + .pickerSectionRow {
+        margin-top: 4px;
+      }
+      .pickerSectionLabel {
+        white-space: nowrap;
+      }
+      .pickerInlineSwatch {
+        justify-self: end;
+      }
+      .modeRow {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+      }
+      .modeRowLabel {
+        white-space: nowrap;
+      }
+      .pickerTopDivider {
+        height: 1px;
+        background: rgba(var(--ui-gray-rgb), 0.12);
+        margin-top: 8px;
+      }
+      #settingsInfoPopup {
+        position: absolute;
+        min-width: 220px;
+        max-width: 280px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.18);
+        border-radius: 8px;
+        background: rgba(10,12,18,0.97);
+        padding: 8px;
+        font-size: var(--ui-font-size);
+        line-height: 1.35;
+        z-index: 1;
+      }
+      #settingsInfoPopup.is-hidden {
+        display: none;
+      }
+
+      #quickSliderOverlay {
+        position: absolute;
+        inset: 0;
+        z-index: 48;
+        display: none;
+        pointer-events: none;
+      }
+      #quickSliderOverlay.is-open { display: block; }
+      #quickSliderBackdrop {
+        position: absolute;
+        inset: 0;
+        background: transparent;
+        pointer-events: none;
+      }
+      #quickSlider {
+        position: absolute;
+        left: max(6px, env(safe-area-inset-left));
+        right: max(6px, env(safe-area-inset-right));
+        bottom: calc(56px + env(safe-area-inset-bottom));
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        padding: 2px 7px 5px;
+        touch-action: none;
+        pointer-events: auto;
+      }
+      .qsTop {
+        margin-bottom: 0;
+        min-height: 6px;
+      }
+      .qsReadout {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 20px;
+      }
+      #qsLabel { font-size: var(--ui-font-size); font-weight: var(--ui-font-weight); }
+      #qsEquals { font-size: var(--ui-font-size); opacity: 0.85; }
+      #qsValue { font-size: var(--ui-font-size); font-variant-numeric: tabular-nums; opacity: 0.95; }
+      #qsClose {
+        min-height: 28px;
+        min-width: 28px;
+        border-radius: 7px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.18);
+        background: rgba(var(--ui-gray-rgb), 0.08);
+        color: var(--text);
+        font-size: var(--ui-font-size);
+      }
+      .qsControlRow {
+        display: grid;
+        grid-template-columns: 43px 1fr 43px 18px 28px;
+        gap: 4px;
+        align-items: center;
+      }
+      .qsSpacer {
+        width: 18px;
+        height: 1px;
+      }
+      .qsStepBtn {
+        min-height: 34px;
+        border-radius: 7px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.18);
+        background: rgba(var(--ui-gray-rgb), 0.08);
+        color: var(--text);
+        font-size: calc(var(--ui-font-size) * 1.2);
+      }
+      #qsRange { width: 100%; height: 24px; touch-action: pan-x; }
+
+      #paramOverlay {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 5px max(5px, env(safe-area-inset-right)) calc(2px + env(safe-area-inset-bottom)) max(5px, env(safe-area-inset-left));
+        background: linear-gradient(180deg, rgba(6, 8, 12, 0), rgba(6, 8, 12, 0.12) 40%, rgba(6, 8, 12, 0.26));
+        pointer-events: none;
+      }
+      .bottomBar {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        gap: 6px;
+        align-items: stretch;
+        pointer-events: auto;
+      }
+      #paramRow {
+        display: contents;
+      }
+      .poItem {
+        position: relative;
+        min-width: 0;
+        background: var(--panel-bg);
+        border: 2px solid var(--param-outline);
+        border-radius: 10px;
+        padding: 4px 6px;
+        --param-bar-style: solid;
+        --param-bar-inset: 10px;
+      }
+      .poItem.po-lock-fix {
+        border-style: solid;
+        --param-bar-style: solid;
+      }
+      .poItem.po-lock-rand {
+        border-style: dashed;
+        --param-bar-style: dashed;
+      }
+      .poItem.po-axis-none {
+        border-color: var(--param-outline);
+      }
+      .poItem.po-axis-manx {
+        border-color: var(--param-outline);
+        border: 0;
+        border-radius: 0;
+      }
+      .poItem.po-axis-manx::before,
+      .poItem.po-axis-manx::after {
+        content: "";
+        position: absolute;
+        left: var(--param-bar-inset);
+        right: var(--param-bar-inset);
+        border-top: 2px var(--param-bar-style) var(--param-outline);
+        pointer-events: none;
+      }
+      .poItem.po-axis-manx::before {
+        top: 0;
+      }
+      .poItem.po-axis-manx::after {
+        bottom: 0;
+      }
+      .poItem.po-axis-many {
+        border-color: var(--param-outline);
+        border: 0;
+        border-radius: 0;
+      }
+      .poItem.po-axis-many::before,
+      .poItem.po-axis-many::after {
+        content: "";
+        position: absolute;
+        top: var(--param-bar-inset);
+        bottom: var(--param-bar-inset);
+        border-left: 2px var(--param-bar-style) var(--param-outline);
+        pointer-events: none;
+      }
+      .poItem.po-axis-many::before {
+        left: 0;
+      }
+      .poItem.po-axis-many::after {
+        right: 0;
+      }
+      .poLabel {
+        display: block;
+        font-size: var(--ui-font-size);
+        font-weight: var(--ui-font-weight);
+        letter-spacing: 0.03em;
+        margin-bottom: 2px;
+        opacity: 0.85;
+        text-align: center;
+      }
+      .poBtn {
+        width: 100%;
+        min-height: calc(var(--ui-font-size) * 1.7);
+        border-radius: 0;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        padding: 2px 4px;
+        font-size: var(--ui-font-size);
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .poBtn.is-na {
+        opacity: 0.7;
+      }
+      .poItem.poName {
+        min-width: 0;
+      }
+
+      #pickerOverlay {
+        position: absolute;
+        inset: 0;
+        z-index: 48;
+        display: none;
+      }
+      #pickerOverlay.is-open { display: block; }
+      #screenshotMenuOverlay {
+        position: absolute;
+        inset: 0;
+        z-index: 45;
+        display: none;
+      }
+      #screenshotMenuOverlay.is-open { display: block; }
+      #screenshotMenuBackdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.2);
+      }
+      #screenshotMenuPanel {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: min(420px, calc(100vw - 12px));
+        max-height: calc(100vh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        overflow: auto;
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        padding: 10px;
+      }
+      .screenshotMenuTitle {
+        font-size: var(--ui-font-size);
+        font-weight: var(--ui-font-weight);
+        margin-bottom: 8px;
+      }
+      .screenshotMenuRow {
+        width: 100%;
+        border-radius: 8px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.24);
+        background: rgba(var(--ui-gray-rgb), 0.1);
+        color: var(--text);
+        text-align: left;
+        padding: 9px 10px;
+        margin-bottom: 8px;
+        font-size: var(--ui-font-size);
+      }
+      .screenshotMenuRow.is-hidden {
+        display: none;
+      }
+      .screenshotMenuHint {
+        display: block;
+        margin-top: 4px;
+        opacity: 0.78;
+        font-size: calc(var(--ui-font-size) * 0.92);
+      }
+      .shareQrContainer {
+        display: grid;
+        justify-items: center;
+        gap: 8px;
+        margin: 4px 0 10px;
+        padding: 10px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.18);
+        border-radius: 8px;
+        background: rgba(var(--ui-gray-rgb), 0.06);
+      }
+      .shareQrContainer.is-hidden {
+        display: none;
+      }
+      .shareQrLabel {
+        text-align: center;
+        opacity: 0.88;
+      }
+      #shareQrCanvas {
+        width: 180px;
+        height: 180px;
+        max-width: min(180px, 100%);
+        background: #ffffff;
+        border-radius: 6px;
+        image-rendering: pixelated;
+      }
+      #screenshotMenuClose {
+        width: 100%;
+        border-radius: 8px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.24);
+        background: transparent;
+        color: var(--text);
+        padding: 7px;
+        font-size: var(--ui-font-size);
+      }
+      #pickerBackdrop {
+        position: absolute;
+        inset: 0;
+        background: transparent;
+      }
+      #pickerPanel {
+        position: absolute;
+        left: max(6px, env(safe-area-inset-left));
+        width: min(648px, calc(100vw - 12px));
+        top: calc(58px + env(safe-area-inset-top));
+        bottom: calc(98px + env(safe-area-inset-bottom));
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+      }
+      #pickerTopControls {
+        flex: 0 0 auto;
+      }
+      #pickerList {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        overflow-x: hidden;
+        touch-action: pan-y;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        padding: 6px;
+      }
+      .pickerOption {
+        width: 100%;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text);
+        text-align: left;
+        padding: 8px;
+        border-radius: 8px;
+        touch-action: pan-y;
+      }
+      .pickerOption.is-selected { border-color: rgba(var(--ui-gray-rgb), 0.24); background: rgba(var(--ui-gray-rgb), 0.08); }
+      .formulaRow {
+        display: block;
+      }
+      .formulaName { font-weight: var(--ui-font-weight); }
+      .formulaPickerHeaderRow {
+        font-weight: 800;
+        padding: 8px 10px 6px;
+        opacity: 0.95;
+      }
+      .cmapRow {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) var(--cmap-bar-width);
+        gap: 10px;
+        align-items: center;
+      }
+      .cmapBar {
+        width: var(--cmap-bar-width);
+        justify-self: end;
+        height: 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(var(--ui-gray-rgb), 0.25);
+      }
+
+      #cameraBtn {
+        position: relative;
+        width: var(--tile-size);
+        height: var(--tile-size);
+        min-height: var(--tile-size);
+        border-radius: 10px;
+        border: 2px solid var(--param-outline);
+        background: var(--panel-bg);
+        color: var(--text);
+        display: inline-grid;
+        align-items: center;
+        justify-content: center;
+        z-index: 33;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+      }
+      #scaleModeBtn {
+        position: relative;
+        width: var(--tile-size);
+        height: var(--tile-size);
+        min-height: var(--tile-size);
+        border-radius: 10px;
+        border: 2px solid var(--param-outline);
+        background: var(--panel-bg);
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 33;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+      }
+      #scaleModeBtn .fitIcon {
+        width: 22px;
+        height: 22px;
+        display: block;
+      }
+      #randomModeBtn {
+        position: relative;
+        width: 100%;
+        min-height: calc(var(--ui-font-size) * 2.1);
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 33;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        font-size: var(--ui-font-size);
+        font-weight: var(--ui-font-weight);
+        letter-spacing: 0.02em;
+        text-align: center;
+        line-height: 1.1;
+        white-space: pre-line;
+        overflow: hidden;
+      }
+      #randomModeTile.is-random {
+        border-style: dashed;
+      }
+      #randomModeTile.is-mixed {
+        border-style: dashed solid dashed solid;
+      }
+      #randomModeTile.is-fixed {
+        border-style: solid;
+      }
+      #rangesEditorToggle .settingsIcon {
+        width: 30px;
+        height: 30px;
+        display: block;
+      }
+      #cameraBtn .cameraIcon,
+      #overlayToggleBtn .eyeIcon {
+        width: 34px;
+        height: 34px;
+        display: block;
+      }
+      #helpBtn .helpIcon {
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1;
+      }
+      .topActionBtn.is-hidden {
+        display: none;
+      }
+      #rangesEditorToggle.is-active,
+      #overlayToggleBtn.is-active,
+      #helpBtn.is-active,
+      #scaleModeBtn.is-active,
+      #cameraBtn.is-active {
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.9);
+      }
+
+      #helpOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 58;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 180ms ease;
+      }
+      #helpOverlay.is-open {
+        opacity: 1;
+        pointer-events: none;
+      }
+      .helpOverlay__dimmer {
+        position: absolute;
+        inset: 0;
+        background: transparent;
+        pointer-events: none;
+      }
+      .helpOverlay__lines {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .helpOverlay__labels {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .helpOverlay__label {
+        position: absolute;
+        max-width: min(460px, calc(100vw - 24px));
+        padding: var(--help-label-padding-y) var(--help-label-padding-x);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(5, 10, 18, 0.86);
+        color: #f2f5ff;
+        font-size: var(--help-label-font-size);
+        line-height: 1.25;
+        text-align: left;
+        display: grid;
+        gap: 4px;
+      }
+      .helpOverlay__label--canvasSplit {
+        text-align: center;
+        padding: 6px 10px;
+      }
+      .helpOverlay__row {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+      }
+      .helpOverlay__rowText {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .helpOverlay__rowText strong,
+      .helpOverlay__rowText span {
+        font-size: inherit;
+        line-height: inherit;
+      }
+      .helpOverlay__rowText span {
+        font-weight: 500;
+      }
+      .helpOverlay__tourControls {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+      }
+      .helpOverlay__tourSlot {
+        display: inline-flex;
+        justify-content: center;
+      }
+      .helpOverlay__tourBtn {
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.34);
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        min-height: 30px;
+        padding: 4px 10px;
+        pointer-events: auto;
+      }
+      .helpOverlay__label strong {
+        font-weight: 700;
+      }
+      .helpOverlay__inlineIcon {
+        width: 22px;
+        height: 22px;
+        min-width: 22px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.07);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1;
+        text-align: center;
+        padding: 1px;
+      }
+      .helpOverlay__inlineIcon svg {
+        width: 18px;
+        height: 18px;
+        display: block;
+      }
+      .helpOverlay__inlineIcon.is-autoscale svg {
+        width: 16px;
+        height: 16px;
+      }
+      .helpOverlay__tilePreview {
+        width: 18px;
+        height: 18px;
+        min-width: 18px;
+        position: relative;
+        box-sizing: border-box;
+        --help-tile-stroke: 1px;
+        --help-tile-radius: 4px;
+        --help-tile-bar-inset: 4px;
+        border-radius: var(--help-tile-radius);
+        border: 0;
+        background: transparent;
+        display: inline-flex;
+      }
+      .helpOverlay__tilePreview--solid,
+      .helpOverlay__tilePreview--dashed {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .helpOverlay__tilePreview--solid {
+        border: var(--help-tile-stroke) solid rgba(255, 255, 255, 0.8);
+      }
+      .helpOverlay__tilePreview--dashed {
+        border: var(--help-tile-stroke) dashed rgba(255, 255, 255, 0.8);
+      }
+      .helpOverlay__tilePreview--side,
+      .helpOverlay__tilePreview--upperLower {
+        border-radius: 0;
+      }
+      .helpOverlay__tilePreview--side::before,
+      .helpOverlay__tilePreview--side::after,
+      .helpOverlay__tilePreview--upperLower::before,
+      .helpOverlay__tilePreview--upperLower::after {
+        content: "";
+        position: absolute;
+        background: rgba(255, 255, 255, 0.82);
+        border-radius: 999px;
+      }
+      .helpOverlay__tilePreview--side::before,
+      .helpOverlay__tilePreview--side::after {
+        top: var(--help-tile-bar-inset);
+        bottom: var(--help-tile-bar-inset);
+        width: var(--help-tile-stroke);
+      }
+      .helpOverlay__tilePreview--side::before {
+        left: 0;
+      }
+      .helpOverlay__tilePreview--side::after {
+        right: 0;
+      }
+      .helpOverlay__tilePreview--upperLower::before,
+      .helpOverlay__tilePreview--upperLower::after {
+        left: var(--help-tile-bar-inset);
+        right: var(--help-tile-bar-inset);
+        height: var(--help-tile-stroke);
+      }
+      .helpOverlay__tilePreview--upperLower::before {
+        top: 0;
+      }
+      .helpOverlay__tilePreview--upperLower::after {
+        bottom: 0;
+      }
+      .helpOverlay__centerDivider {
+        position: absolute;
+        width: 1px;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.9) 0 12px,
+          transparent 12px 20px
+        );
+        transform: translateX(-0.5px);
+      }
+      body.helpOverlay-active #topRightActions {
+        z-index: 64;
+      }
+      body.helpOverlay-active #helpBtn {
+        position: relative;
+        z-index: 65;
+      }
+      #overlayToggleBtn.is-disabled {
+        color: rgba(var(--ui-gray-rgb), 0.45);
+        border-color: rgba(var(--ui-gray-rgb), 0.22);
+        background: rgba(var(--panel-rgb), calc(var(--dialog-alpha) * 0.55));
+      }
+      @media (max-width: 900px), (max-height: 430px) {
+        :root {
+          --ui-font-size: clamp(11px, 2.6vw, 14px);
+          --tile-size: clamp(32px, 9.5vw, 42px);
+          --help-label-font-size: clamp(10px, 2.5vw, 12px);
+          --help-label-padding-y: 6px;
+          --help-label-padding-x: 8px;
+        }
+        .helpOverlay__label {
+          max-width: min(340px, calc(100vw - 14px));
+        }
+        .helpOverlay__row {
+          align-items: flex-start;
+          gap: 6px;
+        }
+        .helpOverlay__inlineIcon,
+        .helpOverlay__tilePreview {
+          width: 18px;
+          height: 18px;
+          min-width: 18px;
+        }
+      }
+
+      @media (max-width: 900px) and (orientation: landscape), (max-height: 430px) and (orientation: landscape) {
+        :root {
+          --ui-font-size: clamp(10px, 2.1vh, 12px);
+          --tile-size: clamp(26px, 7vh, 36px);
+          --help-label-font-size: clamp(10px, 2.4vh, 12px);
+          --help-label-padding-y: 4px;
+          --help-label-padding-x: 6px;
+        }
+        .helpOverlay__label {
+          max-width: min(380px, calc(100vw - 12px));
+          line-height: 1.22;
+        }
+        .helpOverlay__row {
+          gap: 5px;
+        }
+        .helpOverlay__inlineIcon,
+        .helpOverlay__tilePreview {
+          width: 16px;
+          height: 16px;
+          min-width: 16px;
+          border-radius: 0;
+        }
+        .poItem {
+          padding: 3px;
+        }
+        .poLabel {
+          margin-bottom: 1px;
+          line-height: 1;
+        }
+        .poBtn,
+        #randomModeBtn {
+          min-height: 18px;
+          line-height: 1;
+          padding: 2px 3px;
+          overflow: hidden;
+        }
+        #rangesEditorToggle .settingsIcon {
+          width: 22px;
+          height: 22px;
+        }
+        #cameraBtn .cameraIcon,
+        #overlayToggleBtn .eyeIcon {
+          width: 24px;
+          height: 24px;
+        }
+        #helpBtn .helpIcon {
+          width: 22px;
+          height: 22px;
+          font-size: 16px;
+        }
+        #cameraBtn,
+        #scaleModeBtn {
+          border-radius: 8px;
+        }
+      }
+
+      @media (max-width: 900px), (max-height: 430px) {
+        #formulaSettingsPanel,
+        #colorSettingsPanel,
+        #modeSettingsPanel {
+          top: auto;
+          right: max(6px, env(safe-area-inset-right));
+          left: max(6px, env(safe-area-inset-left));
+          bottom: calc(92px + env(safe-area-inset-bottom));
+          width: auto;
+          max-height: 50vh;
+        }
+        #rangesEditorPanel {
+          top: calc(84px + env(safe-area-inset-top));
+          right: max(6px, env(safe-area-inset-right));
+          left: max(6px, env(safe-area-inset-left));
+          bottom: auto;
+          width: auto;
+          max-height: calc(72vh - env(safe-area-inset-top));
+        }
+        .poItem.poName .poLabel,
+        .poItem.poName .poBtn {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="canvasStack">
+        <canvas id="c"></canvas>
+        <canvas id="interestOverlayCanvas"></canvas>
+        <canvas id="debugOverlayCanvas"></canvas>
+        <canvas id="manualOverlayCanvas"></canvas>
+      </div>
+      <p id="toast" aria-live="polite" aria-atomic="true"></p>
+      <div id="debugPanel" class="is-hidden">
+        <p id="debugInfo">Debug off</p>
+      </div>
+      <div id="welcomeOverlay" aria-hidden="true">
+        <section id="welcomePanel" role="dialog" aria-modal="true" aria-label="Welcome">
+          <h2 class="welcomeTitle">Welcome to Attractor Lab</h2>
+          <p class="welcomeBody">Explore and create fascinating patterns using simple controls. Tap and adjust settings, or drag on the screen to shape the pattern in real time. Take the quick tour to learn how it works.</p>
+          <div class="welcomeActions">
+            <button id="welcomeTakeTourBtn" class="welcomeActionBtn" type="button">Take tour</button>
+            <button id="welcomeDontShowBtn" class="welcomeActionBtn" type="button">Don’t show me again</button>
+            <button id="welcomeDismissBtn" class="welcomeActionBtn" type="button">Continue</button>
+          </div>
+        </section>
+      </div>
+      <div id="topRightActions">
+        <div id="version-badge">PR34.6</div>
+        <button id="helpBtn" class="topActionBtn" type="button" aria-label="Help" aria-pressed="false" title="Help"><span class="helpIcon" aria-hidden="true">?</span></button>
+        <button id="rangesEditorToggle" class="topActionBtn" type="button" aria-label="Open ranges editor" aria-pressed="false"><svg class="settingsIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10.2 2.9h3.6l.5 2a7.5 7.5 0 0 1 1.5.6l1.8-1 2.5 2.5-1 1.8c.23.48.43.98.57 1.5l2.05.5v3.6l-2.05.5a7.4 7.4 0 0 1-.57 1.5l1 1.8-2.5 2.5-1.8-1a7.5 7.5 0 0 1-1.5.6l-.5 2h-3.6l-.5-2a7.5 7.5 0 0 1-1.5-.6l-1.8 1-2.5-2.5 1-1.8a7.4 7.4 0 0 1-.57-1.5L2 13.8v-3.6l2.05-.5c.14-.52.34-1.02.57-1.5l-1-1.8 2.5-2.5 1.8 1c.48-.23.98-.43 1.5-.6l.5-2Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.9"/></svg></button>
+        <button id="overlayToggleBtn" class="topActionBtn" type="button" aria-label="Toggle interest overlay" title="Interest overlay"><svg class="eyeIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.2 12s3.3-6 9.8-6 9.8 6 9.8 6-3.3 6-9.8 6-9.8-6-9.8-6Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle class="eyePupil" cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+        <button id="scaleModeBtn" class="topActionBtn" type="button" aria-label="Toggle auto scale"><svg class="fitIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 9 4 4m0 0h3.8M4 4v3.8M15 9l5-5m0 0h-3.8M20 4v3.8M9 15l-5 5m0 0h3.8M4 20v-3.8M15 15l5 5m0 0h-3.8M20 20v-3.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button id="cameraBtn" class="topActionBtn" type="button" aria-label="Take screenshot"><svg class="cameraIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 6h2.2l1.1-1.6a1 1 0 0 1 .83-.44h2.74c.33 0 .64.16.83.44L16.8 6H18a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2Zm4 9a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+      <aside id="rangesEditorPanel" class="is-hidden" aria-label="Settings editor">
+        <div class="rangesEditorBody">
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Startup iterations</span></div>
+            <div class="perfControlRow">
+              <input id="detailStartupIterationsRange" class="perfRangeInput" type="range" min="1000" max="1000000000" step="100" />
+              <div id="detailStartupIterationsFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Random mode max iterations</span><button id="infoMaxRandomIters" class="perfInfoBtn" type="button">i</button></div>
+            <div class="perfControlRow">
+              <input id="detailMaxRandomItersRange" class="perfRangeInput" type="range" min="1000" max="1000000000" step="100" />
+              <div id="detailMaxRandomItersFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Absolute iterations max</span></div>
+            <div class="perfControlRow">
+              <input id="detailIterationAbsoluteMaxRange" class="perfRangeInput" type="range" min="1000" max="1000000000" step="100" />
+              <div id="detailIterationAbsoluteMaxFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">History cache size</span></div>
+            <div class="perfControlRow">
+              <input id="detailHistoryCacheSizeRange" class="perfRangeInput" type="range" min="1" max="20" step="1" />
+              <div id="detailHistoryCacheSizeFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Burn-in steps</span><button id="infoBurn" class="perfInfoBtn" type="button">i</button></div>
+            <div class="perfControlRow">
+              <input id="detailBurnRange" class="perfRangeInput" type="range" min="0" max="5000" step="1" />
+              <div id="detailBurnFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Interest overlay</span></div>
+            <label class="modeOption"><input id="detailInterestOverlayToggle" type="checkbox" /> Show modulation grid overlay while actively modulating both axes</label>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Interest overlay opacity</span></div>
+            <div class="perfControlRow">
+              <input id="detailInterestOverlayOpacityRange" class="perfRangeInput" type="range" min="0.05" max="0.8" step="0.01" />
+              <div id="detailInterestOverlayOpacityFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Interest grid size</span></div>
+            <div class="perfControlRow">
+              <input id="detailInterestGridSizeRange" class="perfRangeInput" type="range" min="8" max="256" step="1" />
+              <div id="detailInterestGridSizeFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Scan iterations per cell</span></div>
+            <div class="perfControlRow">
+              <input id="detailInterestScanIterationsRange" class="perfRangeInput" type="range" min="100" max="5000" step="50" />
+              <div id="detailInterestScanIterationsFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Lyapunov classifier</span></div>
+            <label class="modeOption"><input id="detailInterestLyapunovEnabledToggle" type="checkbox" /> Enable Lyapunov-only high-interest cells</label>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Lyapunov min exponent</span></div>
+            <div class="perfControlRow">
+              <input id="detailInterestLyapunovMinExponentRange" class="perfRangeInput" type="range" min="-1" max="1" step="0.01" />
+              <div id="detailInterestLyapunovMinExponentFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Lyapunov initial delta</span></div>
+            <div class="perfControlRow">
+              <input id="detailInterestLyapunovDelta0Range" class="perfRangeInput" type="range" min="0.0000001" max="0.001" step="0.0000001" />
+              <div id="detailInterestLyapunovDelta0Formatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Lyapunov rescale</span></div>
+            <label class="modeOption"><input id="detailInterestLyapunovRescaleToggle" type="checkbox" /> Renormalize separation to initial delta each step</label>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Lyapunov max distance</span></div>
+            <div class="perfControlRow">
+              <input id="detailInterestLyapunovMaxDistanceRange" class="perfRangeInput" type="range" min="0.001" max="1000000" step="0.001" />
+              <div id="detailInterestLyapunovMaxDistanceFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">High interest threshold</span></div>
+            <div class="perfControlRow">
+              <input id="detailInterestHighThresholdRange" class="perfRangeInput" type="range" min="0.05" max="0.50" step="0.01" />
+              <div id="detailInterestHighThresholdFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Hold speed</span></div>
+            <div class="perfControlRow">
+              <input id="holdSpeedRange" class="perfRangeInput" type="range" min="0.25" max="50" step="0.05" />
+              <div id="holdSpeedValue" class="perfFormattedValue">Hold speed: 1.00×</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Hold repeat interval</span></div>
+            <div class="perfControlRow">
+              <input id="holdRepeatMsRange" class="perfRangeInput" type="range" min="20" max="300" step="1" />
+              <div id="holdRepeatMsValue" class="perfFormattedValue">Repeat interval: 60 ms</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Hold accel start</span></div>
+            <div class="perfControlRow">
+              <input id="holdAccelStartMsRange" class="perfRangeInput" type="range" min="0" max="5000" step="10" />
+              <div id="holdAccelStartMsValue" class="perfFormattedValue">Accel start: 350 ms</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Hold accel end</span></div>
+            <div class="perfControlRow">
+              <input id="holdAccelEndMsRange" class="perfRangeInput" type="range" min="100" max="8000" step="10" />
+              <div id="holdAccelEndMsValue" class="perfFormattedValue">Accel end: 1400 ms</div>
+            </div>
+          </div>
+          <div class="perfSettingCard fullSettingsOnly">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Touch pan deadband (px)</span></div>
+            <div class="perfControlRow">
+              <input id="touchPanDeadbandRange" class="perfRangeInput" type="range" min="0" max="10" step="0.5" />
+              <div id="touchPanDeadbandValue" class="perfFormattedValue">Touch pan deadband: 0.5 px</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Touch zoom deadband (px)</span></div>
+            <div class="perfControlRow">
+              <input id="touchZoomDeadbandRange" class="perfRangeInput" type="range" min="0" max="10" step="0.5" />
+              <div id="touchZoomDeadbandValue" class="perfFormattedValue">Touch zoom deadband: 2.5 px</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Touch zoom ratio min</span></div>
+            <div class="perfControlRow">
+              <input id="touchZoomRatioMinRange" class="perfRangeInput" type="range" min="0" max="0.03" step="0.001" />
+              <div id="touchZoomRatioMinValue" class="perfFormattedValue">Touch zoom ratio min: 0.010</div>
+            </div>
+          </div>
+          <div class="perfSettingCard fullSettingsOnly">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Pan/zoom settle delay (ms)</span></div>
+            <div class="perfControlRow">
+              <input id="panZoomSettleMsRange" class="perfRangeInput" type="range" min="0" max="1000" step="10" />
+              <div id="panZoomSettleMsValue" class="perfFormattedValue">Pan/zoom settle delay: 200 ms</div>
+            </div>
+          </div>
+          <div class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Rotation threshold (°)</span></div>
+            <div class="perfControlRow">
+              <input id="rotationThresholdRange" class="perfRangeInput" type="range" min="0" max="30" step="1" />
+              <div id="rotationThresholdValue" class="perfFormattedValue">Rotation threshold: 15°</div>
+            </div>
+          </div>
+          <div class="perfSettingCard simpleSettingsCard">
+            <div class="perfSettingHead"><span id="detailDebugLabel" class="perfSettingLabel">Debug overlay</span><button id="infoDebug" class="perfInfoBtn fullSettingsOnly" type="button">i</button></div>
+            <label class="modeOption"><input id="detailDebugToggle" type="checkbox" /> <span id="detailDebugToggleLabel">Show debug overlays and diagnostics</span></label>
+            <label class="modeOption fullSettingsOnly"><input id="detailDebugTextToggle" type="checkbox" /> Show debug text</label>
+          </div>
+          <div class="perfSettingCard simpleSettingsCard">
+            <button id="factoryResetBtn" class="rangeActionBtn factoryResetBtn" type="button">Factory reset</button>
+          </div>
+        </div>
+        <div id="settingsInfoPopup" class="is-hidden" role="dialog" aria-live="polite">
+          <div id="settingsInfoText"></div>
+        </div>
+      </aside>
+
+      <aside id="formulaSettingsPanel" class="is-hidden" aria-label="Formula defaults editor">
+        <div class="rangesEditorHead">
+          <strong id="rangesFormulaName" class="formulaNameTitle">Formula</strong>
+          <button id="formulaSettingsClose" type="button" aria-label="Close formula settings">✕</button>
+        </div>
+        <div id="rangesTabPanel" class="rangesEditorBody settingsTabPanel">
+          <div id="rangesFormulaDetail" class="formulaDetailBox" aria-live="polite">
+            <p id="rangesFormulaLineX" class="formulaDetailLine">x_next = --</p>
+            <p id="rangesFormulaLineY" class="formulaDetailLine">y_next = --</p>
+          </div>
+          <div class="formulaParamTable">
+            <div class="formulaParamHead"><span></span><span>min</span><span>default</span><span>max</span></div>
+            <div class="formulaParamRow"><span class="formulaParamKey">a</span><input id="rangeAmin" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /><input id="rangeAdefault" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /><input id="rangeAmax" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /></div>
+            <div class="formulaParamRow"><span class="formulaParamKey">b</span><input id="rangeBmin" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /><input id="rangeBdefault" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /><input id="rangeBmax" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /></div>
+            <div class="formulaParamRow"><span class="formulaParamKey">c</span><input id="rangeCmin" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /><input id="rangeCdefault" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /><input id="rangeCmax" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /></div>
+            <div class="formulaParamRow"><span class="formulaParamKey">d</span><input id="rangeDmin" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /><input id="rangeDdefault" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /><input id="rangeDmax" class="rangeInput" type="number" min="-1000000" max="1000000" step="any" /></div>
+            <div id="extraFormulaParams"></div>
+          </div>
+          <div class="rangeGrid rangeGridTight seedGrid">
+            <label class="rangeField seedFieldX"><span class="rangeFieldLabel">x seed</span><input id="detailSeedXInput" class="rangeInput" type="number" step="0.0001" /></label>
+            <label class="rangeField seedFieldY"><span class="rangeFieldLabel">y seed</span><input id="detailSeedYInput" class="rangeInput" type="number" step="0.0001" /></label>
+          </div>
+          <div class="rangeActions">
+            <button id="formulaSettingsApply" class="rangeActionBtn" type="button">Apply</button>
+            <button id="formulaSettingsReset" class="rangeActionBtn" type="button">Reset Defaults</button>
+            <button id="formulaSettingsCloseBottom" class="rangeActionBtn" type="button">Close</button>
+          </div>
+          <p id="rangesEditorWarning" aria-live="polite"></p>
+        </div>
+      </aside>
+      <aside id="colorSettingsPanel" class="is-hidden" aria-label="Colour map editor">
+        <div class="rangesEditorHead">
+          <strong id="colorSettingsName">Colour map</strong>
+          <button id="colorSettingsClose" type="button" aria-label="Close colour settings">✕</button>
+        </div>
+        <div class="colorSettingsBody">
+          <div id="colorSettingsPreview" class="colorPreviewWide"></div>
+          <div id="colorStopsList"></div>
+          <div class="colorStopActions">
+            <button id="addColorStopBtn" class="rangeActionBtn" type="button">Add stop</button>
+            <button id="resetColorStopsBtn" class="rangeActionBtn" type="button">Reset map</button>
+          </div>
+        </div>
+      </aside>
+      <aside id="modeSettingsPanel" class="is-hidden" aria-label="Colour panel settings">
+        <div class="rangesEditorBody settingsTabPanel">
+          <div id="backgroundSettingsSection" class="perfSettingCard is-hidden">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Dialog transparency</span></div>
+            <div class="perfControlRow">
+              <input id="detailOverlayAlphaRange" class="perfRangeInput" type="range" min="0.1" max="1" step="0.01" />
+              <div id="detailOverlayAlphaFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div id="modeSettingsSection" class="perfSettingCard">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Log strength</span><button id="infoLogStrength" class="perfInfoBtn" type="button">i</button></div>
+            <div class="perfControlRow">
+              <input id="detailLogStrengthRange" class="perfRangeInput" type="range" min="0.5" max="30" step="0.1" />
+              <div id="detailLogStrengthFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard modeSettingsSection">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Gamma</span><button id="infoDensityGamma" class="perfInfoBtn" type="button">i</button></div>
+            <div class="perfControlRow">
+              <input id="detailDensityGammaRange" class="perfRangeInput" type="range" min="0.2" max="2" step="0.01" />
+              <div id="detailDensityGammaFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+          <div class="perfSettingCard modeSettingsSection">
+            <div class="perfSettingHead"><span class="perfSettingLabel">Hybrid age blend</span><button id="infoHybridBlend" class="perfInfoBtn" type="button">i</button></div>
+            <div class="perfControlRow">
+              <input id="detailHybridBlendRange" class="perfRangeInput" type="range" min="0" max="1" step="0.01" />
+              <div id="detailHybridBlendFormatted" class="perfFormattedValue">--</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+      <div id="quickSliderOverlay" aria-hidden="true">
+        <div id="quickSliderBackdrop"></div>
+        <div id="quickSlider">
+          <div class="qsTop">
+            <div class="qsReadout">
+              <span id="qsLabel">Adjust</span>
+              <span id="qsEquals">=</span>
+              <span id="qsValue">0.0</span>
+            </div>
+          </div>
+          <div class="qsControlRow">
+            <button id="qsMinus" class="qsStepBtn" type="button" aria-label="Decrease value">−</button>
+            <input id="qsRange" type="range" min="0" max="100" step="0.1" />
+            <button id="qsPlus" class="qsStepBtn" type="button" aria-label="Increase value">+</button>
+            <span class="qsSpacer" aria-hidden="true"></span>
+            <button id="qsClose" type="button" aria-label="Close slider">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="pickerOverlay" aria-hidden="true">
+        <div id="pickerBackdrop"></div>
+        <div id="pickerPanel" role="dialog" aria-modal="true" aria-label="Picker">
+          <div id="pickerTopControls"></div>
+          <div id="pickerList"></div>
+        </div>
+      </div>
+
+      <div id="screenshotMenuOverlay" aria-hidden="true">
+        <div id="screenshotMenuBackdrop"></div>
+        <div id="screenshotMenuPanel" role="dialog" aria-modal="true" aria-label="Screenshot options">
+          <div class="screenshotMenuTitle">Screenshot options</div>
+          <button id="screenshotMenuClean" class="screenshotMenuRow" type="button">1. Clean screenshot (device full size)</button>
+          <button id="screenshotMenuOverlayOption" class="screenshotMenuRow" type="button">2. Overlay screenshot (device full size)</button>
+          <button id="screenshotMenu4k" class="screenshotMenuRow" type="button">3. Clean screenshot (4K)<span class="screenshotMenuHint">May take a moment to render.</span></button>
+          <button id="screenshotMenu8k" class="screenshotMenuRow" type="button">4. Clean screenshot (8K)<span class="screenshotMenuHint">May take longer to render.</span></button>
+          <button id="screenshotMenuShareRetry" class="screenshotMenuRow is-hidden" type="button">Share prepared screenshot now<span id="screenshotMenuShareRetryHint" class="screenshotMenuHint">Shown when share needs a fresh tap.</span></button>
+          <button id="screenshotMenuCopyLink" class="screenshotMenuRow" type="button" title="Share or copy link">Share</button>
+          <div id="shareQrContainer" class="shareQrContainer is-hidden">
+            <div class="shareQrLabel">Scan to open this pattern</div>
+            <canvas id="shareQrCanvas" width="180" height="180"></canvas>
+          </div>
+          <button id="screenshotMenuClose" type="button" aria-label="Close screenshot options">Close</button>
+        </div>
+      </div>
+
+      <div id="paramOverlay">
+        <div class="bottomBar">
+        <div id="paramRow">
+          <div class="poItem poName">
+            <span class="poLabel">Formula</span>
+            <button id="formulaBtn" class="poBtn" type="button">--</button>
+          </div>
+
+          <div class="poItem poName">
+            <span class="poLabel">Colour map</span>
+            <button id="cmapBtn" class="poBtn" type="button">--</button>
+          </div>
+
+          <div class="poItem">
+            <span class="poLabel">a</span>
+            <button id="btnAlpha" class="poBtn" type="button">--</button>
+          </div>
+
+          <div class="poItem">
+            <span class="poLabel">b</span>
+            <button id="btnBeta" class="poBtn" type="button">--</button>
+          </div>
+
+          <div class="poItem">
+            <span class="poLabel">c</span>
+            <button id="btnDelta" class="poBtn" type="button">--</button>
+          </div>
+
+          <div class="poItem">
+            <span class="poLabel">d</span>
+            <button id="btnGamma" class="poBtn" type="button">--</button>
+          </div>
+          <div class="poItem">
+            <span class="poLabel">iterations</span>
+            <button id="btnIters" class="poBtn" type="button">--</button>
+          </div>
+        </div>
+        <div id="randomModeTile" class="poItem">
+          <button id="randomModeBtn" type="button" aria-label="Toggle randomise all mode">Random
+All</button>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./js/vendor/qrcode-generator.js"></script>
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>
